@@ -3,7 +3,7 @@ title: "boston_foodmapping"
 author: "Ningze Zu"
 date: "11/3/2018"
 output:
-  html_document:
+  pdf_document:
     df_print: paged
 ---
 
@@ -59,9 +59,7 @@ icons <- awesomeIcons(
 )
 
 # Show first 200 rows from the boston_food dataset
-leaflet(boston.500) %>% addTiles() %>% addAwesomeMarkers(~long, ~lat, icon=icons, popup = ~as.character(businessName), label = ~as.character(ViolStatus)) 
-#%>% addProviderTiles(providers$Esri.NatGeoWorldMap) 
-#%>% addLegend("bottomright",colors = ViolStatus, values = ~ViolStatus,title = "Violstatus", opacity = 1)
+leaflet(boston.500) %>% addTiles() %>% addAwesomeMarkers(~long, ~lat, icon=icons, popup = ~as.character(businessName), label = ~as.character(ViolStatus)) %>% addProviderTiles(providers$Esri.NatGeoWorldMap)  %>%  addLegend("bottomright",colors=c("red","green"),labels = c("Fail","Pass"),title = "Violstatus", opacity = 1)
 
 ```
 
