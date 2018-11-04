@@ -1,13 +1,15 @@
 ---
-title: "mapping"
-author: "name"
+title: "boston_foodmapping"
+author: "Ningze Zu"
 date: "11/3/2018"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-mayorsfoodcourt <- read.csv("Downloads/mayorsfoodcourt.csv")
+mayorsfoodcourt <- read.csv("mayorsfoodcourt.csv")
 library(knitr)
 library(tidyverse)
 library(maps)
@@ -17,12 +19,18 @@ library(devtools)
 library(maptools)
 library(plyr)
 library(raster)
+library(leaflet)
+library(sp)
+library(magrittr)
+library(htmltools)
 ```
 
 
 ```{r}
 #cleaning the data
 #filter food courts whose licsense status is active and VIOLDTTM in 2018.
+
+
 boston_food <- mayorsfoodcourt %>% filter(str_detect(VIOLDTTM, "2018")) %>% filter(LICSTATUS=="Active") %>% separate(Location, c("lat","long"),",") %>% filter(!is.na(long) & !is.na(lat))
 #covert location into latitude and longtitude. 
 boston_food$lat <- as.numeric(gsub("\\(", "", boston_food$lat))
@@ -31,44 +39,41 @@ boston_food$long <- as.numeric(gsub(")", "", boston_food$long))
 
 ```
 
-
-
 ```{r}
-data(us.cities)
-boston <- map.cities(x=boston, country = "MA")
-ma<- map_data("county", region = "massachus")
-boston_foodmap <- left_join(ma, boston_food)
-ggplot() + geom_polygon(data=ma, aes(x=long, y=lat, group=group), color = "cornsilk", fill = "cadetblue") +  
-  geom_point(data = boston_food, aes(x = long, y = lat, group=), size = 5) + coord_fixed(1.3)
-boston_foodmap <- left_join(ma, boston_food)
+#leaflet 
+data(boston_food)
+boston.500 <- boston_food[1:500,]
+getColor <- function(boston_food) {
+  sapply(boston_food$ViolStatus, function(ViolStatus) {
+  if(ViolStatus == "Pass") {
+    "green"
+  } else if(ViolStatus == "Fail"){
+    "red"
+  } })
+}
+icons <- awesomeIcons(
+  icon = 'ios-close',
+  iconColor = 'black',
+  library = 'ion',
+  markerColor = getColor(boston.500)
+)
 
+# Show first 200 rows from the boston_food dataset
+leaflet(boston.500) %>% addTiles() %>% addAwesomeMarkers(~long, ~lat, icon=icons, popup = ~as.character(businessName), label = ~as.character(ViolStatus)) 
+#%>% addProviderTiles(providers$Esri.NatGeoWorldMap) 
+#%>% addLegend("bottomright",colors = ViolStatus, values = ~ViolStatus,title = "Violstatus", opacity = 1)
 
 ```
 
+
 ```{r}
-boston_bbox <- make_bbox(lat = lat, lon = long, data = boston_foodmap)
-boston_map <- get_map(location = boston_bbox, source = "google", maptype = "hybrid")
+boston_map<- make_bbox(lat = lat, lon = long, data = boston_food)
+boston_map <- get_map(location = boston_map, source = "google", maptype = "hybrid")
 ggmap(boston_map) + 
   geom_point(data = boston_food, mapping = aes(x = long, y = lat, color= ViolStatus))
-
-
 ```
 
-```{r}
-library(leaflet)
-library(sp)
-library(magrittr)
-library(maps)
-library(htmltools)
-library(rgdal)
-data("quakes")
-head(quakes)
-m <- leaflet(data = boston_food) %>% setView(lng = -71.0589, lat = 42.3601, zoom = 12) %>% addMarkers(~long, ~lat, popup = ~as.character(businessName), label = ~as.character(businessName))
-
-m %>% addTiles()
-m %>% addProviderTiles(providers$Esri.NatGeoWorldMap)
 
 
 
-```
 
