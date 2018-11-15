@@ -1,74 +1,105 @@
 library(shiny)
 library(leaflet)
-boston_food <- read.csv("boston1.csv")
-boston_food <- boston_food[1:500,]
-#########
-ui <- bootstrapPage(
-  navbarPage("Boston Food Inspection", 
-  tabPanel("Mapping",
-  leafletOutput("map", width = "100%", height = 600),
-  absolutePanel(top = 55, right = 25,
-                h2("Inspection Search"), 
-                sliderInput("count", "Violation counts", min(boston_food$count), max(boston_food$count),
-                            value = range(boston_food$count)),
-                selectInput("city", "Choose a City", boston_food$CITY))
-)))
+library(geojsonio)
+library(raster)
+library(tigris)
+library(dplyr)
+I <- read.csv("I.csv")
+D <- read.csv("D.csv")
+R <- read.csv("R.csv")
 
-#########
+
+ui <- navbarPage("Political Party Donations", id="nav",
+                 
+                 tabPanel("mapping",
+                          div(class="outer",
+                              leafletOutput("map", width="100%", height = 585),
+                              absolutePanel(top = 70,right = 50, width = 200,
+                                            h2("Search"), 
+                                            selectInput("var","Select Political Party",
+                                                        choices=c("Democrats","Republican","Independent"))
+                              ))))
+
 server <- function(input, output, session) {
   
-  getColor <- function(boston_food) {
-    sapply(boston_food$count, function(count) {
-      if(count >= 10 & count <20) {
-        "beige"
-      } else if(count < 10 & count >=1){
-        "green"
-      } else if( count >=20 & count <100){
-        "purple"
-      } else if( count >=100 & count <234){
-        "blue"
-      } 
-    })
-  }
-  icons <- awesomeIcons(
-    icon = "coffee",
-    iconColor = 'white',
-    library = 'ion',
-    markerColor = getColor(boston_food)
-  )
-  
-  ########  
-  filteredData <- reactive({
-    boston_food[boston_food$count >= input$count[1] & boston_food$count <= input$count[2],]  
-
-     })
-  
-  
-  #########  
   output$map <- renderLeaflet({
+    states <- states(cb=T)
     
-    leaflet(boston_food) %>% addTiles() %>%
-      fitBounds(~min(long), ~min(lat), ~max(long), ~max(lat))  %>% 
-      addLegend("bottomright",colors=c("green","beige","violet","blue"),
-                labels = c("<10","10~20","20~100",">100"),title = "Violation Counts", opacity = 1) %>%  
-      addMeasure(
-        position = "bottomleft",
-        primaryLengthUnit = "meters",
-        primaryAreaUnit = "sqmeters",
-        activeColor = "#3D535D",
-        completedColor = "#7D4479")
+    if (input$var == "Democrats") {
+      d <- D %>% rename(state=D_st_abrev)
+      d_join <- geo_join(states, d, "STUSPS", "state")
+      pal <- colorNumeric("Greens", domain = d_join$Donations)
+      popup_sb <- paste0("<strong>", d_join$state, 
+                         "</strong><br />Donations: ", d_join$Donations,
+                         "<br />Donors: ", 
+                         as.character(d_join$Donors))
+      leaflet() %>%
+        addTiles() %>%
+        setView(-98.483330, 38.712046, zoom = 4) %>% 
+        addPolygons(data = d_join , 
+                    fillColor = ~pal(d_join$Donations), 
+                    fillOpacity = 0.7, 
+                    weight = 0.4, 
+                    smoothFactor = 0.2, 
+                    popup = ~popup_sb) %>%
+        addLegend(pal = pal, 
+                  values = d_join$Donations, 
+                  position = "bottomright", 
+                  title = "Donations")
+      
+      
+      
+      
+    } else if (input$var == "Republican") {
+      r <- R %>% rename(state=R_st_abrev)
+      r_join <- geo_join(states, r, "STUSPS", "state")
+      pal <- colorNumeric("Oranges", domain=r_join$Donations)
+      popup_sb <- paste0("<strong>", r_join$state, 
+                         "</strong><br />Donations: ", r_join$Donations,
+                         "<br />Donors: ", 
+                         as.character(r_join$Donors))
+      leaflet() %>%
+        addTiles() %>%
+        setView(-98.483330, 38.712046, zoom = 4) %>% 
+        addPolygons(data = r_join , 
+                    fillColor = ~pal(r_join$Donations), 
+                    fillOpacity = 0.7, 
+                    weight = 0.2, 
+                    smoothFactor = 0.2, 
+                    popup = ~popup_sb) %>%
+        addLegend(pal = pal, 
+                  values = r_join$Donations, 
+                  position = "bottomright", 
+                  title = "Donations")
+      
+    } else if (input$var == "Independent") {
+      i <- I %>% rename(state=I_st_abrev)
+      i_join <- geo_join(states, i, "STUSPS", "state")
+      pal <- colorNumeric("Blues", domain=i_join$Donations)
+      popup_sb <- paste0("<strong>", i_join$state, 
+                         "</strong><br />Donations: ", i_join$Donations,
+                         "<br />Donors: ", 
+                         as.character(i_join$Donors))
+      leaflet() %>%
+        addTiles() %>%
+        setView(-98.483330, 38.712046, zoom = 4) %>% 
+        addPolygons(data = i_join , 
+                    fillColor = ~pal(i_join$Donations), 
+                    fillOpacity = 0.7, 
+                    weight = 0.2, 
+                    smoothFactor = 0.2, 
+                    popup = ~popup_sb) %>%
+        addLegend(pal = pal, 
+                  values = i_join$Donations, 
+                  position = "bottomright", 
+                  title = "Donations")
+      
+    }
+    
+    
+    
   })
   
-  #########
-  observe({
-   
-    
-    leafletProxy("map", data=filteredData()) %>% 
-      clearMarkers() %>%
-      addAwesomeMarkers(data=filteredData(), ~ long, ~lat, 
-                        icon=icons, popup = ~as.character(businessName), 
-                        options = popupOptions(closeButton = FALSE), label = ~paste(Address)
-      )}
-  )
 }
-shinyApp(ui, server)
+
+shinyApp(ui = ui,server = server)
